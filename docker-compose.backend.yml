@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: ./application/backend
+    container_name: api
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - MONGO_URI=mongodb://mongo:27017/movies
+    depends_on:
+      - mongo
+    networks:
+      - app-network
+
+  mongo:
+    image: mongo:latest
+    container_name: mongo-db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app-network
+
+volumes:
+  mongo_data:
+
+networks:
+  app-network:
+    driver: bridge
