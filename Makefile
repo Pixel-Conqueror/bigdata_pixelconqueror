@@ -18,3 +18,10 @@ clean:
 
 shell:
 	docker exec -it bigdata-container bash
+
+init_hdfs:
+	docker exec -it namenode bash /scripts/init_hdfs.sh
+
+run_etl:
+	docker exec -it spark-master spark-submit \
+	  --master local[*] /scripts/batch_etl.py

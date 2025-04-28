@@ -6,13 +6,16 @@ services:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
     container_name: namenode
     ports:
-      - "9000:9000"   # RPC
-      - "9870:9870"   # UI
+      - "9000:9000"    # HDFS RPC
+      - "9870:9870"    # Namenode UI
     environment:
       - CLUSTER_NAME=bigdata-cluster
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
       - HDFS_CONF_dfs_replication=1
     volumes:
+      - ./config/hadoop:/etc/hadoop/conf
+      - ./data:/data
+      - ./scripts:/scripts
       - hadoop_namenode:/hadoop/dfs/name
 
   datanode:
@@ -24,6 +27,7 @@ services:
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
       - HDFS_CONF_dfs_datanode_data_dir=file:///hadoop/dfs/data
     volumes:
+      - ./config/hadoop:/etc/hadoop/conf
       - hadoop_datanode:/hadoop/dfs/data
 
   resourcemanager:
@@ -34,6 +38,8 @@ services:
       - datanode
     environment:
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    volumes:
+      - ./config/hadoop:/etc/hadoop/conf
 
   nodemanager:
     image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
@@ -42,6 +48,8 @@ services:
       - resourcemanager
     environment:
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    volumes:
+      - ./config/hadoop:/etc/hadoop/conf
 
   historyserver:
     image: bde2020/hadoop-historyserver:2.0.0-hadoop3.2.1-java8
@@ -51,6 +59,7 @@ services:
     environment:
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
     volumes:
+      - ./config/hadoop:/etc/hadoop/conf
       - hadoop_history:/hadoop/yarn/timeline
 
   # ── Spark ────────────────────────────────────────────────────────────
@@ -64,6 +73,8 @@ services:
       - HADOOP_CONF_DIR=/etc/hadoop/conf
     volumes:
       - ./config/hadoop:/etc/hadoop/conf
+      - ./data:/data
+      - ./scripts:/scripts
     depends_on:
       - namenode
 
@@ -73,6 +84,9 @@ services:
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
+      - HADOOP_CONF_DIR=/etc/hadoop/conf
+    volumes:
+      - ./config/hadoop:/etc/hadoop/conf
     depends_on:
       - spark-master
 
