@@ -1,35 +1,55 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useEffect, useState } from 'react';
+import { Movie } from "./interfaces/Movie";
+import { Link } from 'react-router-dom'
+import { getMovies } from './services/dataService';
 
-function App() {
-  const [count, setCount] = useState(0)
+function HomePage() {
+  const [movies, setMovies] = useState<Movie[]>([]);
+
+  useEffect(() => {
+    const fetchMovies = async () => {
+      const data = await getMovies();
+      setMovies(data);
+    };
+    fetchMovies();
+  }, []);
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div className="p-8">
+      <h1 className="text-3xl font-bold mb-6">Liste des Films</h1>
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white border border-gray-300">
+          <thead>
+            <tr>
+              <th className="py-2 px-4 border-b">Movie ID</th>
+              <th className="py-2 px-4 border-b">Title</th>
+              <th className="py-2 px-4 border-b">Genre</th>
+              <th className="py-2 px-4 border-b">Average Rating</th>
+              <th className="py-2 px-4 border-b">Détail</th>
+            </tr>
+          </thead>
+          <tbody>
+            {movies.map((movie) => (
+              <tr key={movie.movieId} className="hover:bg-gray-100">
+                <td className="py-2 px-4 border-b text-center">{movie.movieId}</td>
+                <td className="py-2 px-4 border-b">{movie.title}</td>
+                <td className="py-2 px-4 border-b text-center">{movie.genres}</td>
+                <td className="py-2 px-4 border-b text-center">{movie.averageRating}</td>
+                <td className="py-2 px-4 border-b text-center">
+                  <Link
+                    to={`/movies/${movie.movieId}`}
+                    className="text-blue-500 hover:underline"
+                  >
+                    Voir
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    </div>
+  );
 }
 
-export default App
+export default HomePage;
