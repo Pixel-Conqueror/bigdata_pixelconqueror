@@ -27,13 +27,20 @@ init_hdfs:
 batch_etl:
 	@echo "▶️  Lancement de l’ETL batch…"
 	docker exec -it spark-master spark-submit \
-	  --master local[*] /scripts/etl_batch.py
+	  --master local[*] \
+	  --driver-memory 4g \
+	  --conf spark.driver.maxResultSize=2g \
+	  /scripts/etl_batch.py
+
 
 # 6. Entraînement ALS
 train_als:
 	@echo "▶️  Entraînement du modèle ALS…"
 	docker exec -it spark-master spark-submit \
-	  --master local[*] /scripts/train_als.py
+	  --master local[*] \
+	  --driver-memory 4g \
+	  --conf spark.driver.maxResultSize=2g \
+	  /scripts/train_als.py
 
 # 7. Pipeline complet
 pipeline: clean up init_hdfs batch_etl train_als

@@ -1,114 +1,80 @@
-# Cellule 1 – Imports & SparkSession
+#!/usr/bin/env python3
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, year, month, dayofmonth, count, mean, stddev
-from pyspark.sql.window import Window
-from pyspark.sql.functions import avg, stddev, expr
-spark = SparkSession.builder \
-    .appName("BatchETLPipelineEnhanced") \
-    .master("local[*]") \
-    .config("spark.driver.memory", "4g") \
-    .config("spark.driver.maxResultSize", "1g") \
-    .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000") \
-    .getOrCreate()
-
-movies_raw = spark.read.csv(
-    "hdfs://namenode:9000/movielens/raw/movies/movies.csv",
-    header=True, inferSchema=True
-)
-ratings_raw = spark.read.csv(
-    "hdfs://namenode:9000/movielens/raw/ratings/ratings.csv",
-    header=True, inferSchema=True
+from pyspark.sql.functions import (
+    col, year, month, dayofmonth,
+    avg, stddev
 )
 
-print(f"🔍 Raw films  : {movies_raw.count()}")
-print(f"🔍 Raw notes  : {ratings_raw.count()}")
+def main():
+    spark = SparkSession.builder \
+        .appName("BatchETL") \
+        .master("local[*]") \
+        .config("spark.driver.memory", "4g") \
+        .config("spark.driver.maxResultSize", "2g") \
+        .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000") \
+        .getOrCreate()
 
-movies_raw.show(5, truncate=False)
-ratings_raw.show(5, truncate=False)
-stats = ratings_raw.select(
-    mean("rating").alias("mean"),
-    stddev("rating").alias("stddev")
-).first()
-mean_rating, stddev_rating = stats["mean"], stats["stddev"]
-print(f"Mean={mean_rating:.3f}, StdDev={stddev_rating:.3f}")
+    # Lecture raw
+    movies_raw = spark.read.csv(
+        "hdfs://namenode:9000/movielens/raw/movies/movies.csv",
+        header=True, inferSchema=True
+    )
+    ratings_raw = spark.read.csv(
+        "hdfs://namenode:9000/movielens/raw/ratings/ratings.csv",
+        header=True, inferSchema=True
+    )
 
-ratings_raw.groupBy("rating").count().orderBy("rating").show()
+    # Stats globales
+    stats = ratings_raw.select(
+        avg("rating").alias("mu"),
+        stddev("rating").alias("sigma")
+    ).first()
+    mu, sigma = stats["mu"], stats["sigma"]
 
+    # Z-score par utilisateur
+    user_stats = ratings_raw.groupBy("userId") \
+        .agg(
+            avg("rating").alias("mu_u"),
+            stddev("rating").alias("sigma_u")
+        )
+    ratings_z = ratings_raw.join(user_stats, "userId") \
+        .withColumn("z_score", (col("rating") - col("mu_u"))/col("sigma_u"))
 
-# 1. Stats globales
-stats = ratings_raw.select(mean("rating").alias("μ"), stddev("rating").alias("σ")).first()
-μ, σ = stats["μ"], stats["σ"]
+    clean1 = ratings_z.filter(col("z_score").between(-3,3)) \
+        .filter((col("rating") >= mu - 3*sigma) & (col("rating") <= mu + 3*sigma))
 
-# 2. Z-score par utilisateur
-user_stats = ratings_raw.groupBy("userId") \
-    .agg(avg("rating").alias("μ_u"), stddev("rating").alias("σ_u"))
+    # Filtre sur volumes d’interactions
+    user_counts = clean1.groupBy("userId").count().filter(col("count") >= 20)
+    movie_counts = clean1.groupBy("movieId").count().filter(col("count") >= 50)
+    clean2 = clean1.join(user_counts, "userId").join(movie_counts, "movieId")
 
-ratings_z = ratings_raw.join(user_stats, "userId") \
-    .withColumn("z_score", (col("rating") - col("μ_u"))/col("σ_u"))
+    # Suppression nulls & doublons (sans cache)
+    ratings_clean = clean2.dropna(
+        how="any",
+        subset=["userId","movieId","rating","timestamp"]
+    ).dropDuplicates(["userId","movieId","timestamp"])
 
-# 3. Filtrage z-score et global
-clean1 = ratings_z.filter((col("z_score").between(-3,3))) \
-    .filter((col("rating") >= μ - 3*σ) & (col("rating") <= μ + 3*σ))
+    # Enrichissement temporel
+    ratings_enriched = ratings_clean \
+        .withColumn("year",  year(col("timestamp"))) \
+        .withColumn("month", month(col("timestamp"))) \
+        .withColumn("day",   dayofmonth(col("timestamp")))
 
-# 4. Compter interactions nettes
-user_counts = clean1.groupBy("userId").count().alias("user_count")
-movie_counts = clean1.groupBy("movieId").count().alias("movie_count")
+    # Écriture CSV batch
+    movies_raw.repartition(1) \
+        .write.option("header", True) \
+        .mode("overwrite") \
+        .csv("hdfs://namenode:9000/movielens/processed/batch/movies_csv")
 
-# 5. Exclure les petits volumes
-clean2 = clean1.join(user_counts.filter(col("count")>=20), "userId") \
-               .join(movie_counts.filter(col("count")>=50), "movieId")
+    ratings_enriched.select(
+        "userId","movieId","rating","timestamp","year","month","day"
+    ).coalesce(1) \
+      .write.option("header", True) \
+      .mode("overwrite") \
+      .csv("hdfs://namenode:9000/movielens/processed/batch/ratings_csv")
 
-# 6. Suppression nulls/doublons
-ratings_clean = clean2 \
-    .dropna(how="any", subset=["userId","movieId","rating","timestamp"]) \
-    .dropDuplicates(["userId","movieId","timestamp"]) \
-    .cache()
+    print("🎉 ETL batch terminé : CSV prêts dans HDFS")
+    spark.stop()
 
-count_after = ratings_clean.count()
-print(f"📊 Notes après nettoyage : {count_after}")
-ratings_clean.show(3, truncate=False)
-ratings_enriched = (ratings_clean
-    .withColumn("year",  year(col("timestamp")))
-    .withColumn("month", month(col("timestamp")))
-    .withColumn("day",   dayofmonth(col("timestamp")))
-)
-ratings_enriched.show(5, truncate=False)
-ratings_final = ratings_enriched.select(
-    "userId","movieId","rating","timestamp","year","month","day"
-)
-
-# Vérif
-print("Champs finaux :", ratings_final.columns)
-ratings_final.show(3, truncate=False)
-# Movies en 1 unique CSV
-movies_raw.repartition(1) \
-    .write \
-    .option("header", True) \
-    .mode("overwrite") \
-    .csv("hdfs://namenode:9000/movielens/processed/batch/movies_csv")
-
-# Ratings en 1 unique CSV
-ratings_final.coalesce(1) \
-    .write \
-    .option("header", True) \
-    .mode("overwrite") \
-    .csv("hdfs://namenode:9000/movielens/processed/batch/ratings_csv")
-
-print("🎉 Écriture CSV terminée")
-# Lecture des movies depuis CSV
-df_movies = spark.read.csv(
-    "hdfs://namenode:9000/movielens/processed/batch/movies_csv",
-    header=True, inferSchema=True
-)
-
-# Lecture des ratings depuis CSV
-df_ratings = spark.read.csv(
-    "hdfs://namenode:9000/movielens/processed/batch/ratings_csv",
-    header=True, inferSchema=True
-)
-
-print(f"✔️ Films CSV   : {df_movies.count()}")
-print(f"✔️ Notes CSV   : {df_ratings.count()}")
-
-df_movies.show(5, truncate=False)
-df_ratings.show(5, truncate=False)
+if __name__ == "__main__":
+    main()
