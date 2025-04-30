@@ -3,6 +3,8 @@ import MovieRow from '../components/MovieRow';
 import '../index.css'
 import '../styles/Home.css'
 import { fetchTrendingMovies, fetchMoviesByGenre } from '../services/tmdb';
+import MoviesTable from '../components/DashboardTable';
+
 
 const Home: React.FC = () => {
     const [trending, setTrending] = useState([]);
@@ -22,7 +24,10 @@ const Home: React.FC = () => {
             <MovieRow title="Notre sélection" movies={trending} />
             <MovieRow title="Films d'action" movies={actionMovies} />
             <MovieRow title="Comédies" movies={comedyMovies} />
+
+            <MoviesTable></MoviesTable>
         </div>
+
     );
 };
 
