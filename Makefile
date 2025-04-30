@@ -1,27 +1,42 @@
-PROJECT_NAME=bigdata-env
+# Makefile
 
-build:
-	docker build -t $(PROJECT_NAME) .
-
+# 1. Lancer l’environnement Docker
 up:
 	docker-compose up -d
 
+# 2. Arrêter & nettoyer
 down:
 	docker-compose down
 
-logs:
-	docker-compose logs -f
-	
+
 clean:
 	docker-compose down --rmi all --volumes --remove-orphans
 	docker system prune -af
 
-shell:
-	docker exec -it bigdata-container bash
+# 3. Voir les logs
+logs:
+	docker-compose logs -f
 
+
+# 4. Ingestion des CSV bruts dans HDFS
 init_hdfs:
+	@echo "▶️  Initialisation HDFS et ingestion des CSV…"
 	docker exec -it namenode bash /scripts/init_hdfs.sh
 
-run_etl:
+# 5. ETL batch (nettoyage + enrichment + écriture CSV)
+batch_etl:
+	@echo "▶️  Lancement de l’ETL batch…"
 	docker exec -it spark-master spark-submit \
-	  --master local[*] /scripts/batch_etl.py
+	  --master local[*] /scripts/etl_batch.py
+
+# 6. Entraînement ALS
+train_als:
+	@echo "▶️  Entraînement du modèle ALS…"
+	docker exec -it spark-master spark-submit \
+	  --master local[*] /scripts/train_als.py
+
+# 7. Pipeline complet
+pipeline: clean up init_hdfs batch_etl train_als
+	@echo "✅ Pipeline complète terminée !"
+
+.PHONY: up down logs ingest_etl train_als pipeline
