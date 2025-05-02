@@ -5,103 +5,149 @@ services:
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
     container_name: namenode
+    hostname: namenode
     ports:
       - "9000:9000"    # HDFS RPC
-      - "9870:9870"    # Namenode UI
+      - "9870:9870"    # Namenode Web UI
     environment:
       - CLUSTER_NAME=bigdata-cluster
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
       - HDFS_CONF_dfs_replication=1
+      - HDFS_CONF_dfs_namenode_datanode_registration_ip-hostname-check=false
+      - CORE_CONF_hadoop_http_staticuser_user=root
+      - HDFS_CONF_dfs_permissions=false
+      - HDFS_CONF_dfs_webhdfs_enabled=true
+      - CORE_CONF_hadoop_proxyuser_hue_hosts=*
+      - CORE_CONF_hadoop_proxyuser_hue_groups=*
+      - CORE_CONF_net_topology_node_switch_mapping_impl=org.apache.hadoop.net.ScriptBasedMapping
+      - CORE_CONF_net_topology_script_file_name=/dev/null
     volumes:
-      - ./config/hadoop:/etc/hadoop/conf
-      - ./data:/data
-      - ./scripts:/scripts
       - hadoop_namenode:/hadoop/dfs/name
+      - ./scripts:/scripts
+      - ./data:/data    
+    networks:
+      - hadoop_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9870"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
     container_name: datanode
+    hostname: datanode
     depends_on:
       - namenode
     environment:
+      - CLUSTER_NAME=bigdata-cluster
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
-      - HDFS_CONF_dfs_datanode_data_dir=file:///hadoop/dfs/data
+      - HDFS_CONF_dfs_namenode_datanode_registration_ip-hostname-check=false
+      - HDFS_CONF_dfs_datanode_use_datanode_hostname=true
+      - HDFS_CONF_dfs_datanode_data_dir=/hadoop/dfs/data
+      - HDFS_CONF_dfs_datanode_address=0.0.0.0:9866
+      - HDFS_CONF_dfs_datanode_http_address=0.0.0.0:9864
+      - HDFS_CONF_dfs_datanode_ipc_address=0.0.0.0:9867
     volumes:
-      - ./config/hadoop:/etc/hadoop/conf
       - hadoop_datanode:/hadoop/dfs/data
+    networks:
+      - hadoop_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://namenode:9870"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   resourcemanager:
     image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
     container_name: resourcemanager
+    hostname: resourcemanager
     depends_on:
       - namenode
       - datanode
     environment:
+      - CLUSTER_NAME=bigdata-cluster
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
-    volumes:
-      - ./config/hadoop:/etc/hadoop/conf
+      - CORE_CONF_hadoop_http_staticuser_user=root
+    networks:
+      - hadoop_network
 
   nodemanager:
     image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
     container_name: nodemanager
+    hostname: nodemanager
     depends_on:
       - resourcemanager
     environment:
+      - CLUSTER_NAME=bigdata-cluster
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
-    volumes:
-      - ./config/hadoop:/etc/hadoop/conf
+      - CORE_CONF_hadoop_http_staticuser_user=root
+    networks:
+      - hadoop_network
 
   historyserver:
     image: bde2020/hadoop-historyserver:2.0.0-hadoop3.2.1-java8
     container_name: historyserver
+    hostname: historyserver
     depends_on:
       - resourcemanager
     environment:
+      - CLUSTER_NAME=bigdata-cluster
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+      - CORE_CONF_hadoop_http_staticuser_user=root
     volumes:
-      - ./config/hadoop:/etc/hadoop/conf
       - hadoop_history:/hadoop/yarn/timeline
+    networks:
+      - hadoop_network
 
   # ── Spark ────────────────────────────────────────────────────────────
   spark-master:
     image: bitnami/spark:3.5.1
     container_name: spark-master
+    hostname: spark-master
     environment:
       - SPARK_MODE=master
       - SPARK_MASTER_HOST=spark-master
       - SPARK_MASTER_PORT=7077
-      - HADOOP_CONF_DIR=/etc/hadoop/conf
+      - HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
     volumes:
-      - ./config/hadoop:/etc/hadoop/conf
-      - ./data:/data
       - ./scripts:/scripts
     depends_on:
       - namenode
+    networks:
+      - hadoop_network
 
   spark-worker:
     image: bitnami/spark:3.5.1
     container_name: spark-worker
+    hostname: spark-worker
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
-      - HADOOP_CONF_DIR=/etc/hadoop/conf
-    volumes:
-      - ./config/hadoop:/etc/hadoop/conf
+      - HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
     depends_on:
       - spark-master
+    networks:
+      - hadoop_network
 
   # ── Kafka & Zookeeper ─────────────────────────────────────────────────
   zookeeper:
     image: bitnami/zookeeper:3.8
     container_name: zookeeper
+    hostname: zookeeper
     ports:
       - "2181:2181"
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - hadoop_network
 
   kafka:
     image: bitnami/kafka:3.6.1
     container_name: kafka
+    hostname: kafka
     ports:
       - "9092:9092"
     environment:
@@ -111,23 +157,33 @@ services:
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
     depends_on:
       - zookeeper
+    networks:
+      - hadoop_network
 
-  # ── Jupyter / PySpark ──────────────────────────────────────────────────
+  # ── Jupyter Notebook / PySpark ────────────────────────────────────────
   jupyter:
     image: jupyter/pyspark-notebook:latest
     container_name: jupyter
+    hostname: jupyter
     ports:
       - "8888:8888"
     volumes:
       - .:/home/jovyan/work
-      - ./config/hadoop:/etc/hadoop/conf
     environment:
-      - HADOOP_CONF_DIR=/etc/hadoop/conf
-      - YARN_CONF_DIR=/etc/hadoop/conf
+      - HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop
+      - YARN_CONF_DIR=/opt/hadoop/etc/hadoop
     depends_on:
       - namenode
       - spark-master
       - kafka
+    networks:
+      - hadoop_network
+
+# Définition du réseau personnalisé avec DNS intégré
+networks:
+  hadoop_network:
+    driver: bridge
+    name: hadoop_network
 
 volumes:
   hadoop_namenode:
