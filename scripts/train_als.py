@@ -8,7 +8,7 @@ from pyspark.sql.functions import expr, collect_list
 from pyspark.mllib.evaluation import RankingMetrics
 
 def main():
-    # Démarre Spark en allouant suffisamment de mémoire et en ajustant les partitions de shuffle
+    # 1. Démarrage de Spark
     spark = (
         SparkSession.builder
         .appName("ALS_Training_Optimized")
@@ -21,26 +21,24 @@ def main():
     )
     spark.sparkContext.setLogLevel("WARN")
 
-    # Charge le CSV des évaluations depuis HDFS, sélectionne les colonnes utiles et mets en cache
+    # 2. Chargement des ratings depuis HDFS
     ratings = (
         spark.read
-        .csv("hdfs://namenode:9000/movielens/processed/batch/ratings_csv",
-             header=True, inferSchema=True)
-        .select("userId", "movieId", "rating")
-        .persist(StorageLevel.MEMORY_AND_DISK)
+             .csv("hdfs://namenode:9000/movielens/processed/batch/ratings_csv",
+                  header=True, inferSchema=True)
+             .select("userId", "movieId", "rating")
+             .persist(StorageLevel.MEMORY_AND_DISK)
     )
-
-    # Force le calcul du cache et affiche le nombre d'interactions
     total = ratings.count()
     print(f"▷ Total interactions : {total}")
 
-    # Sépare en ensembles train (80%) et test (20%), et mets chacun en cache
+    # 3. Split train/test
     train, test = ratings.randomSplit([0.8, 0.2], seed=42)
     train = train.persist(StorageLevel.MEMORY_AND_DISK)
-    test = test.persist(StorageLevel.MEMORY_AND_DISK)
+    test  = test.persist(StorageLevel.MEMORY_AND_DISK)
     print(f"▷ Entraînement : {train.count()}  •  Test : {test.count()}")
 
-    # Définit l'ALS avec gestion des cold starts, et prépare l'évaluateur RMSE
+    # 4. Définition d’ALS et de l’évaluateur
     als = ALS(
         userCol="userId", itemCol="movieId", ratingCol="rating",
         coldStartStrategy="drop"
@@ -49,44 +47,53 @@ def main():
         metricName="rmse", labelCol="rating", predictionCol="prediction"
     )
 
-    # Construit la grille d'hyperparamètres à tester
+    # 5. Grille d’hyper-paramètres
     paramGrid = (
         ParamGridBuilder()
-        .addGrid(als.rank, [10, 20, 30])
-        .addGrid(als.regParam, [0.01, 0.1])
-        .addGrid(als.maxIter, [5, 10])
-        .build()
+            .addGrid(als.rank,    [10, 20, 30])
+            .addGrid(als.regParam,[0.01, 0.1])
+            .addGrid(als.maxIter, [5, 10])
+            .build()
     )
 
-    # Configure la recherche avec TrainValidationSplit pour aller plus vite
+    # 6. Configuration de la recherche
     tvs = TrainValidationSplit(
         estimator=als,
         estimatorParamMaps=paramGrid,
         evaluator=evaluator,
         trainRatio=0.8,
-        parallelism=4  # Monter ou descendre selon le nombre de cœurs dispo
+        parallelism=4
     )
 
-    # Lance l'entraînement et récupère le meilleur modèle
-    tvsModel = tvs.fit(train)
+    # 7. Entraînement et meilleur modèle
+    tvsModel  = tvs.fit(train)
     bestModel = tvsModel.bestModel
 
-    # Extrait et affiche les meilleurs paramètres
-    best_rank = bestModel._java_obj.parent().getOrDefault(als.rank)
-    best_reg = bestModel._java_obj.parent().getOrDefault(als.regParam)
-    best_iter = bestModel._java_obj.parent().getOrDefault(als.maxIter)
+    # ── Récupération des meilleurs hyper-paramètres ────────────────────────
+    # On récupère la liste des ParamMaps et des scores
+    paramMaps = tvsModel.getEstimatorParamMaps()
+    metrics   = tvsModel.validationMetrics  # liste de RMSE pour chaque combinaison
+
+    # Trouver l’indice de la meilleure métrique (minimum de RMSE)
+    bestIndex    = min(range(len(metrics)), key=lambda i: metrics[i])
+    bestParamMap = paramMaps[bestIndex]
+
+    # Extraire rank, regParam et maxIter depuis ce ParamMap
+    best_rank = bestParamMap[als.rank]
+    best_reg  = bestParamMap[als.regParam]
+    best_iter = bestParamMap[als.maxIter]
     print(f"▷ Meilleurs paramètres : rank={best_rank}, regParam={best_reg}, maxIter={best_iter}")
 
-    # Évalue les performances sur l'ensemble de test (RMSE & MAE)
+    # 8. Évaluation sur le test (RMSE & MAE)
     predictions = bestModel.transform(test)
     rmse = evaluator.evaluate(predictions)
-    mae = RegressionEvaluator(
+    mae  = RegressionEvaluator(
         metricName="mae", labelCol="rating", predictionCol="prediction"
     ).evaluate(predictions)
     print(f"▷ Test RMSE : {rmse:.4f}")
     print(f"▷ Test MAE  : {mae:.4f}")
 
-    # Prépare et calcule les métriques de ranking (Precision, Recall, MAP, NDCG)
+    # 9. Métriques de ranking
     recs = (
         bestModel
         .recommendForAllUsers(10)
@@ -99,16 +106,16 @@ def main():
     )
     pred_and_labels = (
         recs.join(actual, "userId")
-        .select("pred", "actual")
-        .rdd.map(lambda r: (r.pred, r.actual))
+            .select("pred", "actual")
+            .rdd.map(lambda r: (r.pred, r.actual))
     )
-    metrics = RankingMetrics(pred_and_labels)
-    print(f"Precision@10 : {metrics.precisionAt(10):.4f}")
-    print(f"Recall@10    : {metrics.recallAt(10):.4f}")
-    print(f"MAP@10       : {metrics.meanAveragePrecision:.4f}")
-    print(f"NDCG@10      : {metrics.ndcgAt(10):.4f}")
+    metrics_rank = RankingMetrics(pred_and_labels)
+    print(f"Precision@10 : {metrics_rank.precisionAt(10):.4f}")
+    print(f"Recall@10    : {metrics_rank.recallAt(10):.4f}")
+    print(f"MAP@10       : {metrics_rank.meanAveragePrecision:.4f}")
+    print(f"NDCG@10      : {metrics_rank.ndcgAt(10):.4f}")
 
-    # Sauvegarde du modèle optimisé dans HDFS
+    # 10. Sauvegarde du modèle
     bestModel.write().overwrite().save(
         "hdfs://namenode:9000/movielens/models/als_best"
     )
