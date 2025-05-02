@@ -21,7 +21,7 @@ logs:
 # 4. Ingestion des CSV bruts dans HDFS
 init_hdfs:
 	@echo "▶️  Initialisation HDFS et ingestion des CSV…"
-	docker exec -it namenode bash /scripts/init_hdfs.sh
+	docker-compose exec namenode bash /scripts/init_hdfs.sh
 
 
 # 5. ETL batch (nettoyage + enrichment + écriture CSV)
