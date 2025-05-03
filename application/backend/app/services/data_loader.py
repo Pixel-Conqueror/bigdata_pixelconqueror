@@ -126,6 +126,16 @@ def insert_data():
         print(f"[FATAL] Rating insert failed: {e}")
         ratings_result = {"inserted": 0, "failed": "FATAL"}
 
+    try:
+        db.movies.create_index("title")
+        db.ratings.create_index([("movieId", 1), ("rating", 1)])
+        db.ratings.create_index("movieId")
+    except Exception as e:
+        print(f"[FATAL] Index creation failed: {e}")
+        return {
+            "status": "failed"
+        }
+
     return {
         "status": "completed",
         "movies": movies_result,
