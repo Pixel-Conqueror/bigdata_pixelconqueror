@@ -1,13 +1,18 @@
-FROM node:22-alpine3.18 AS build
+FROM node:22.14-alpine3.20 AS base
+
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile
+
 COPY . .
-RUN npm run build
+RUN pnpm build
 
 FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
+
+COPY --from=base /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 3000
-CMD ["nginx", "-g", "daemon off;"] 
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
