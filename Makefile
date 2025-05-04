@@ -68,10 +68,10 @@ streaming:
 
 
 # 8. Pipelines complètes
-pipeline: clean up init_hdfs batch_etl load_to_mongo train_als streaming generate_recs
+pipeline: clean up init_hdfs batch_etl load_to_mongo train_al generate_recs streaming
 	@echo "✅ Pipeline complète terminée !"
 
-pipeline_light: clean up init_hdfs batch_etl_light load_to_mongo train_als streaming generate_recs
+pipeline_light: clean up init_hdfs batch_etl_light load_to_mongo train_als generate_recs streaming
 	@echo "✅ Pipeline light complète terminée !"
 
 
@@ -80,7 +80,6 @@ generate_recs:
 	docker-compose exec spark-master spark-submit \
 	  --master local[*] \
 	  /scripts/generate_all_recommendations.py
-
 test_update:
 	@echo "▶️  Test mise à jour pour un utilisateur…"
 	docker-compose exec jupyter python3 /scripts/test_update_user.py
