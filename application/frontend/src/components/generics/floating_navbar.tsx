@@ -9,6 +9,7 @@ import {
 import { useDisclosure, useHeadroom, useMediaQuery } from "@mantine/hooks";
 import { useEffect } from "react";
 import { projectName } from "../../config/project";
+import { InputMovieRedirect } from "../input_movie_redirect";
 import { ApiStatus } from "./api_status";
 import { InternalLink } from "./internal_link";
 
@@ -55,7 +56,12 @@ export function FloatingNavbar({ width }: FloatingNavbarProps) {
 					</InternalLink>
 				</Group>
 
-				{!isMobile && <ApiStatus />}
+				{!isMobile && (
+					<Group gap="xs">
+						<InputMovieRedirect />
+						<ApiStatus />
+					</Group>
+				)}
 			</Group>
 
 			{/* Mobile drawer */}
@@ -66,6 +72,7 @@ export function FloatingNavbar({ width }: FloatingNavbarProps) {
 				title={projectName}
 				zIndex={999999}
 			>
+				<InputMovieRedirect />
 				<ApiStatus />
 			</Drawer>
 		</Box>
