@@ -41,6 +41,15 @@ batch_etl_light:
 	  --conf spark.driver.maxResultSize=2g \
 	  /scripts/etl_batch_light.py
 
+#5.1 ingestion des données dans mongodb
+load_to_mongo:
+	docker-compose exec spark-master spark-submit \
+	  --master spark://spark-master:7077 \
+	  --packages org.mongodb.spark:mongo-spark-connector_2.12:10.2.0 \
+	  /scripts/ingest_to_mongo.py
+
+
+
 # 6. Entraînement ALS
 train_als:
 	@echo "▶️  Entraînement du modèle ALS…"
@@ -60,10 +69,10 @@ streaming:
 	  /scripts/streaming_recommendations.py
 
 # 8. Pipelines complètes
-pipeline: clean up init_hdfs batch_etl train_als streaming
+pipeline: clean up init_hdfs batch_etl ingest_to_mongo train_als streaming
 	@echo "✅ Pipeline complète terminée !"
 
-pipeline_light: clean up init_hdfs batch_etl_light train_als streaming
+pipeline_light: clean up init_hdfs batch_etl_light ingest_to_mongo train_als streaming
 	@echo "✅ Pipeline light complète terminée !"
 
 # Backend commands
