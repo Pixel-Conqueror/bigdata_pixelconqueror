@@ -1,18 +1,18 @@
 services:
-  # ── Frontend ────────────────────────────────────────────────────────
-  frontend:
-    build:
-      context: ./application/frontend
-    container_name: frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - REACT_APP_API_URL=http://localhost:5001
-    volumes:
-      - ./application/frontend:/app
-      - /app/node_modules
-    networks:
-      - app-network
+  # # ── Frontend ────────────────────────────────────────────────────────
+  # frontend:
+  #   build:
+  #     context: ./application/frontend
+  #   container_name: frontend
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - REACT_APP_API_URL=http://localhost:5001
+  #   volumes:
+  #     - ./application/frontend:/app
+  #     - /app/node_modules
+  #   networks:
+  #     - app-network
 
   # ── Backend ─────────────────────────────────────────────────────────
   backend:

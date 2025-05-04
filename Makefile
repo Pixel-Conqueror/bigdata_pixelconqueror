@@ -8,8 +8,6 @@ up:
 down:
 	docker compose down
 
-logs:
-	docker compose logs -f
 	
 clean:
 	docker compose down --rmi all --volumes --remove-orphans
@@ -43,10 +41,11 @@ batch_etl_light:
 
 #5.1 ingestion des données dans mongodb
 load_to_mongo:
-	docker-compose exec spark-master spark-submit \
-	  --master spark://spark-master:7077 \
-	  --packages org.mongodb.spark:mongo-spark-connector_2.12:10.2.0 \
-	  /scripts/ingest_to_mongo.py
+	docker-compose exec backend \
+	  spark-submit \
+	    --master local[*] \
+	    --conf spark.mongodb.output.uri=$${MONGO_URI} \
+	    /scripts/ingest_to_mongo.py
 
 
 
@@ -62,10 +61,8 @@ train_als:
 # 7. Lancer le streaming
 streaming:
 	@echo "▶️  Démarrage du job streaming…"
-	docker exec -d spark-master spark-submit \
+	docker-compose exec spark-master spark-submit \
 	  --master local[*] \
-	  --driver-memory 2g \
-	  --conf spark.hadoop.fs.defaultFS=hdfs://namenode:9000 \
 	  /scripts/streaming_recommendations.py
 
 # 8. Pipelines complètes

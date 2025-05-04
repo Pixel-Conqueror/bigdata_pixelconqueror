@@ -1,31 +1,36 @@
 #!/usr/bin/env python3
 # scripts/ingest_spark_to_mongo.py
 
+import os
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import split, col
 from pymongo import MongoClient
 
-MONGO_URI = "mongodb://mongo:27017"
-DB_NAME   = "movielens"
+# reprendre votre get_db()
+def get_db():
+    mongo_uri = os.getenv("MONGO_URI", "mongodb://mongo:27017/movies")
+    client = MongoClient(mongo_uri)
+    return client.get_default_database()
 
 def write_movies(partition):
-    client = MongoClient(MONGO_URI)
-    coll  = client[DB_NAME].movies
-    docs  = []
+    db = get_db()
+    coll = db.movies
+    docs = []
     for row in partition:
+        # si "(no genres listed)" ou champ vide, on met "unknown"
+        raw_genres = row.genres or ""
+        cleaned = "unknown" if raw_genres.strip() == "(no genres listed)" else raw_genres
         docs.append({
             "movieId": int(row.movieId),
             "title":    row.title,
-            "genres":   row.genres.split("|") if row.genres else []
+            "genres":   cleaned.split("|") if cleaned else ["unknown"]
         })
     if docs:
         coll.insert_many(docs)
-    client.close()
 
 def write_ratings(partition):
-    client = MongoClient(MONGO_URI)
-    coll  = client[DB_NAME].ratings
-    docs  = []
+    db = get_db()
+    coll = db.ratings
+    docs = []
     for row in partition:
         docs.append({
             "userId":    int(row.userId),
@@ -38,7 +43,6 @@ def write_ratings(partition):
         })
     if docs:
         coll.insert_many(docs)
-    client.close()
 
 def main():
     spark = SparkSession.builder \
@@ -47,7 +51,7 @@ def main():
         .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000") \
         .getOrCreate()
 
-    # Lecture CSV nettoyés
+    # lire vos CSV HDFS
     movies = spark.read.csv(
         "hdfs://namenode:9000/movielens/processed/batch/movies_csv",
         header=True, inferSchema=True
@@ -58,14 +62,12 @@ def main():
         header=True, inferSchema=True
     ).select("userId","movieId","rating","timestamp","year","month","day")
 
-    # On vide d'abord les anciennes collections
-    client = MongoClient(MONGO_URI)
-    db     = client[DB_NAME]
+    # on supprime d'abord les données existantes
+    db = get_db()
     db.movies.delete_many({})
     db.ratings.delete_many({})
-    client.close()
 
-    # Écriture par partition
+    # écrire par partition
     movies.rdd.foreachPartition(write_movies)
     ratings.rdd.foreachPartition(write_ratings)
 
