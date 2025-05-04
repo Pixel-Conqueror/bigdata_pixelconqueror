@@ -44,3 +44,29 @@ export type MoviesResponse = {
 	total_movies: number;
 	total_pages: number;
 };
+
+export type UserRating = {
+	movieId: number;
+	title: string;
+	genres: string[];
+	rating: number;
+	timestamp: string;
+};
+
+export type UserRecommendation = {
+	movieId: number;
+	title: string;
+	genres: string[];
+};
+
+export type UserDetails = {
+	userId: number;
+	username: string;
+	total_ratings: number;
+	ratings_page: number;
+	ratings_total_pages: number;
+	has_next: boolean;
+	has_prev: boolean;
+	ratings: UserRating[];
+	recommendations: UserRecommendation[];
+};

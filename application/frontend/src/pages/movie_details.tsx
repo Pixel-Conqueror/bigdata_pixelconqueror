@@ -3,14 +3,16 @@ import {
 	Grid,
 	Group,
 	Rating,
+	RatingProps,
 	Table,
 	TableData,
-	TableProps,
 	Text,
 	Title,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
+import { InternalLink } from "../components/generics/internal_link";
+import { getCommonTableProps } from "../lib/table";
 import { apiService, querykeys } from "../services/api_service";
 
 export const MovieDetails = () => {
@@ -22,46 +24,44 @@ export const MovieDetails = () => {
 
 	if (!movie) return null;
 
+	const commonRatingProps: RatingProps = {
+		readOnly: true,
+		fractions: 2,
+	};
 	const ratingData: TableData = {
 		caption: "Distribution des notes",
 		head: ["Note", "Nombre"],
 		body: Object.entries(movie.rating_distribution ?? {})
 			.sort((a, b) => Number(b[1]) - Number(a[1]))
 			.map(([rating, count]) => [
-				<Rating value={Number(rating)} readOnly />,
+				<Rating value={Number(rating)} {...commonRatingProps} />,
 				count,
 			]),
+		...getCommonTableProps(),
 	};
 
 	const topReviewsData: TableData = {
 		caption: "Meilleures notes",
 		head: ["Utilisateur", "Note"],
 		body: movie.top_reviews.map((review) => [
-			review.username,
-			<Rating value={review.rating} readOnly />,
+			<InternalLink to={`/users/${review.userId}`}>
+				{review.username}
+			</InternalLink>,
+			<Rating value={review.rating} {...commonRatingProps} />,
 		]),
+		...getCommonTableProps(),
 	};
 
 	const worstReviewsData: TableData = {
 		caption: "Pires notes",
 		head: ["Utilisateur", "Note"],
 		body: movie.worst_reviews.map((review) => [
-			review.username,
-			<Rating value={review.rating} readOnly />,
+			<InternalLink to={`/users/${review.userId}`}>
+				{review.username}
+			</InternalLink>,
+			<Rating value={review.rating} {...commonRatingProps} />,
 		]),
-	};
-
-	const commonProps: TableProps = {
-		striped: true,
-		highlightOnHover: true,
-		withTableBorder: true,
-		withColumnBorders: true,
-		verticalSpacing: "sm",
-		styles: {
-			table: {
-				borderRadius: "var(--mantine-radius-md)",
-			},
-		},
+		...getCommonTableProps(),
 	};
 
 	return (
@@ -83,21 +83,21 @@ export const MovieDetails = () => {
 			<Grid grow>
 				<Grid.Col span={1}>
 					{movie.rating_distribution ? (
-						<Table data={ratingData} {...commonProps} />
+						<Table data={ratingData} />
 					) : (
 						<Text>Aucune distribution de notes disponible</Text>
 					)}
 				</Grid.Col>
 				<Grid.Col span={2}>
 					{movie.top_reviews.length > 0 ? (
-						<Table data={topReviewsData} {...commonProps} />
+						<Table data={topReviewsData} />
 					) : (
 						<Text>Aucune note disponible</Text>
 					)}
 				</Grid.Col>
 				<Grid.Col span={2}>
 					{movie.worst_reviews.length > 0 ? (
-						<Table data={worstReviewsData} {...commonProps} />
+						<Table data={worstReviewsData} />
 					) : (
 						<Text>Aucune note disponible</Text>
 					)}

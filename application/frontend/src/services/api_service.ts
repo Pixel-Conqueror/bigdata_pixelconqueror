@@ -3,6 +3,7 @@ import {
 	Movie,
 	MoviesResponse,
 	ShapesData,
+	UserDetails,
 } from "../types/index";
 
 const API_URL = "http://localhost:5001";
@@ -12,6 +13,20 @@ interface GetMoviesParams {
 	page: number;
 	title?: string;
 	genre?: string;
+}
+
+export interface UserRating {
+	movieId: number;
+	title: string;
+	genres: string[];
+	rating: number;
+	timestamp: string;
+}
+
+export interface UserRecommendation {
+	movieId: number;
+	title: string;
+	genres: string[];
 }
 
 export const querykeys = {
@@ -24,6 +39,7 @@ export const querykeys = {
 		selectedGender?: string | null
 	) => ["movies", page, limit, searchQuery, selectedGender],
 	movieDetails: (movieId: number) => ["movie", movieId],
+	userDetails: (userId: number, page: number) => ["user", userId, page],
 };
 
 export const apiService = {
@@ -53,6 +69,19 @@ export const apiService = {
 
 	async getMovieDetails(movieId: number): Promise<Movie> {
 		const response = await fetch(`${API_URL}/api/movies/${movieId}`);
+		return response.json();
+	},
+
+	async getUserDetails({
+		userId,
+		page,
+	}: {
+		userId: number;
+		page: number;
+	}): Promise<UserDetails> {
+		const response = await fetch(
+			`${API_URL}/api/users/${userId}?page=${page}&limit=${LIMIT}`
+		);
 		return response.json();
 	},
 

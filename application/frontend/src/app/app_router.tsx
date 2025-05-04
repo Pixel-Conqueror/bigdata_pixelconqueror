@@ -11,6 +11,7 @@ import { BaseLayout } from "../layouts/_base_layout";
 import DefaultLayout from "../layouts/default_layout";
 import { Home } from "../pages/home";
 import { MovieDetails } from "../pages/movie_details";
+import { UserDetails } from "../pages/user_details";
 import { apiService, querykeys } from "../services/api_service";
 
 const query_client = new QueryClient({
@@ -30,8 +31,8 @@ const router = createBrowserRouter([
 			{
 				index: true,
 				element: <Home />,
-				loader: async () => {
-					await Promise.all([
+				loader: () =>
+					Promise.all([
 						query_client.prefetchQuery({
 							queryKey: querykeys.health,
 							queryFn: apiService.getHealth,
@@ -44,19 +45,31 @@ const router = createBrowserRouter([
 							queryKey: querykeys.movies(1, 50),
 							queryFn: () => apiService.getMovies({ page: 1 }),
 						}),
-					]);
-					return null;
-				},
+					]),
 			},
 			{
 				path: "/movies/:movieId",
 				element: <MovieDetails />,
-				loader: async ({ params }) => {
+				loader: ({ params }) => {
 					const movieId = params.movieId;
 					if (!movieId) {
 						throw new Error("Movie ID is required");
 					}
-					return await apiService.getMovieDetails(Number(movieId));
+					return apiService.getMovieDetails(Number(movieId));
+				},
+			},
+			{
+				path: "/users/:userId",
+				element: <UserDetails />,
+				loader: ({ params }) => {
+					const userId = params.userId;
+					if (!userId) {
+						throw new Error("User ID is required");
+					}
+					return apiService.getUserDetails({
+						userId: Number(userId),
+						page: 1,
+					});
 				},
 			},
 		],
