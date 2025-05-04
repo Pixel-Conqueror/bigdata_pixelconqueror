@@ -167,6 +167,7 @@ services:
       - ALLOW_PLAINTEXT_LISTENER=yes
       - KAFKA_LISTENERS=PLAINTEXT://:9092
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CREATE_TOPICS=movielens_ratings:1:1
     depends_on:
       - zookeeper
     networks:

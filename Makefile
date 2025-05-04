@@ -63,7 +63,9 @@ streaming:
 	@echo "▶️  Démarrage du job streaming…"
 	docker-compose exec spark-master spark-submit \
 	  --master local[*] \
+	  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 \
 	  /scripts/streaming_recommendations.py
+
 
 # 8. Pipelines complètes
 pipeline: clean up init_hdfs batch_etl load_to_mongo train_als streaming
