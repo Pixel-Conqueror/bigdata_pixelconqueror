@@ -186,3 +186,74 @@ def get_movie_details(movie_id):
         "worst_reviews": [format_review(r) for r in worst_reviews],
         "rating_distribution": rating_distribution
     })
+
+from datetime import datetime
+
+@bp.route('/api/users/<int:user_id>', methods=['GET'])
+def get_user_profile(user_id):
+    db = get_db()
+
+    try:
+        page = int(request.args.get('page', 1))
+        if page < 1:
+            raise ValueError
+    except ValueError:
+        return jsonify({"error": "Invalid page number"}), 400
+
+    page_size = 50
+    skip_count = (page - 1) * page_size
+
+    user = db.users.find_one({"userId": user_id}, {"_id": 0, "userId": 1, "username": 1})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    total_ratings = db.ratings.count_documents({"userId": user_id})
+    total_pages = (total_ratings + page_size - 1) // page_size
+
+    ratings_cursor = db.ratings.find(
+        {"userId": user_id},
+        {"_id": 0, "movieId": 1, "rating": 1, "timestamp": 1}
+    ).sort("timestamp", -1).skip(skip_count).limit(page_size)
+
+    ratings = list(ratings_cursor)
+    movie_ids = [r["movieId"] for r in ratings]
+
+    movies_info = db.movies.find(
+        {"movieId": {"$in": movie_ids}},
+        {"_id": 0, "movieId": 1, "title": 1, "genres": 1}
+    )
+    movie_map = {m["movieId"]: m for m in movies_info}
+
+    enriched_ratings = []
+    for r in ratings:
+        movie = movie_map.get(r["movieId"])
+        if movie:
+            enriched_ratings.append({
+                "movieId": r["movieId"],
+                "title": movie["title"],
+                "genres": movie["genres"],
+                "rating": r["rating"],
+                "timestamp": r["timestamp"].isoformat() if isinstance(r["timestamp"], datetime) else str(r["timestamp"])
+            })
+
+    reco_doc = db.recommendations.find_one({"userId": user_id}, {"_id": 0, "recommendations": 1})
+    recommended_movie_ids = reco_doc["recommendations"] if reco_doc else []
+
+    recommended_movies_cursor = db.movies.find(
+        {"movieId": {"$in": recommended_movie_ids}},
+        {"_id": 0, "movieId": 1, "title": 1, "genres": 1}
+    )
+    recommended_movies = list(recommended_movies_cursor)
+
+    return jsonify({
+        "userId": user["userId"],
+        "username": user["username"],
+        "total_ratings": total_ratings,
+        "ratings_page": page,
+        "ratings_total_pages": total_pages,
+        "has_next": page < total_pages,
+        "has_prev": page > 1,
+        "ratings": enriched_ratings,
+        "recommendations": recommended_movies
+    })
+
