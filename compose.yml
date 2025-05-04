@@ -163,6 +163,23 @@ services:
     networks:
       - app-network
 
+  # kafka:
+  #   image: bitnami/kafka:3.6.1
+  #   container_name: kafka
+  #   ports:
+  #     - "9092:9092"
+  #   environment:
+  #     - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+  #     - ALLOW_PLAINTEXT_LISTENER=yes
+  #     - KAFKA_LISTENERS=PLAINTEXT://:9092
+  #     - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+  #     - KAFKA_CREATE_TOPICS=movielens_ratings:1:1
+  #     - KAFKA_CFG_auto_create_topics_enable=true
+  #     - BITNAMI_KAFKA_CREATE_TOPICS=movielens_ratings:1:1
+  #   depends_on:
+  #     - zookeeper
+  #   networks:
+  #     - app-network
   kafka:
     image: bitnami/kafka:3.6.1
     container_name: kafka
@@ -171,15 +188,37 @@ services:
     environment:
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
       - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=false
       - KAFKA_LISTENERS=PLAINTEXT://:9092
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - KAFKA_CREATE_TOPICS=movielens_ratings:1:1
-      - KAFKA_CFG_auto_create_topics_enable=true
-      - BITNAMI_KAFKA_CREATE_TOPICS=movielens_ratings:1:1
+    volumes:
+      - ./scripts:/scripts:ro
+    command:
+      - bash
+      - -c
+      - |
+        # Démarre kafka en arrière-plan
+        /opt/bitnami/scripts/kafka/run.sh & 
+        PID=$!
+        # Attends qu’il soit prêt
+        echo "⏳ Waiting for Kafka…"
+        until kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1; do
+          sleep 2
+        done
+        # Crée le topic si besoin
+        kafka-topics.sh --bootstrap-server localhost:9092 \
+          --create --if-not-exists --topic movielens_ratings \
+          --partitions 1 --replication-factor 1
+        echo "✅ Topic movielens_ratings ready"
+        # Laisse kafka tourner
+        wait $PID
     depends_on:
       - zookeeper
     networks:
       - app-network
+
+
+
 
   # ── Jupyter / PySpark ──────────────────────────────────────────────────
   jupyter:
@@ -189,6 +228,7 @@ services:
       - "8888:8888"
     volumes:
       - .:/home/jovyan/work
+      - ./scripts:/scripts
       - ./config/hadoop:/etc/hadoop/conf
     environment:
       - HADOOP_CONF_DIR=/etc/hadoop/conf
