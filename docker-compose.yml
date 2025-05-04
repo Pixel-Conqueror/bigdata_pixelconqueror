@@ -1,29 +1,135 @@
-version: "3.8"
+version: '3.8'
 
 services:
-  bigdata:
-    build: .
-    container_name: bigdata-container
+  # ── Hadoop HDFS & YARN ────────────────────────────────────────────
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    ports:
+      - "9000:9000"    # HDFS RPC
+      - "9870:9870"    # Namenode UI
+    environment:
+      - CLUSTER_NAME=bigdata-cluster
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+      - HDFS_CONF_dfs_replication=1
+    volumes:
+      - ./config/hadoop:/etc/hadoop/conf
+      - ./data:/data
+      - ./scripts:/scripts
+      - hadoop_namenode:/hadoop/dfs/name
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    depends_on:
+      - namenode
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+      - HDFS_CONF_dfs_datanode_data_dir=file:///hadoop/dfs/data
+    volumes:
+      - ./config/hadoop:/etc/hadoop/conf
+      - hadoop_datanode:/hadoop/dfs/data
+
+  resourcemanager:
+    image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
+    container_name: resourcemanager
+    depends_on:
+      - namenode
+      - datanode
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    volumes:
+      - ./config/hadoop:/etc/hadoop/conf
+
+  nodemanager:
+    image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
+    container_name: nodemanager
+    depends_on:
+      - resourcemanager
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    volumes:
+      - ./config/hadoop:/etc/hadoop/conf
+
+  historyserver:
+    image: bde2020/hadoop-historyserver:2.0.0-hadoop3.2.1-java8
+    container_name: historyserver
+    depends_on:
+      - resourcemanager
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    volumes:
+      - ./config/hadoop:/etc/hadoop/conf
+      - hadoop_history:/hadoop/yarn/timeline
+
+  # ── Spark ────────────────────────────────────────────────────────────
+  spark-master:
+    image: bitnami/spark:3.5.1
+    container_name: spark-master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_MASTER_HOST=spark-master
+      - SPARK_MASTER_PORT=7077
+      - HADOOP_CONF_DIR=/etc/hadoop/conf
+    volumes:
+      - ./config/hadoop:/etc/hadoop/conf
+      - ./data:/data
+      - ./scripts:/scripts
+    depends_on:
+      - namenode
+
+  spark-worker:
+    image: bitnami/spark:3.5.1
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - HADOOP_CONF_DIR=/etc/hadoop/conf
+    volumes:
+      - ./config/hadoop:/etc/hadoop/conf
+    depends_on:
+      - spark-master
+
+  # ── Kafka & Zookeeper ─────────────────────────────────────────────────
+  zookeeper:
+    image: bitnami/zookeeper:3.8
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+
+  kafka:
+    image: bitnami/kafka:3.6.1
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+    depends_on:
+      - zookeeper
+
+  # ── Jupyter / PySpark ──────────────────────────────────────────────────
+  jupyter:
+    image: jupyter/pyspark-notebook:latest
+    container_name: jupyter
     ports:
       - "8888:8888"
-      - "9092:9092"
-      - "2181:2181"
-      - "9870:9870"
-    environment:
-      - JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-      - HADOOP_HOME=/opt/hadoop
-      - SPARK_HOME=/opt/spark
-      - KAFKA_HOME=/opt/kafka
-      - PATH=/opt/hadoop/bin:/opt/hadoop/sbin:/opt/spark/bin:/opt/spark/sbin:/opt/kafka/bin:$PATH
     volumes:
-      - ./config/hadoop:/opt/hadoop/etc/hadoop
-    command: >
-      bash -c "
-        /opt/hadoop/bin/hdfs namenode -format &&
-        /opt/hadoop/sbin/start-dfs.sh &&
-        /opt/hadoop/sbin/start-yarn.sh &&
-        /opt/kafka/bin/zookeeper-server-start.sh /opt/kafka/config/zookeeper.properties &
-        sleep 5 &&
-        /opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties &
-        jupyter notebook --ip=0.0.0.0 --port=8888 --allow-root --NotebookApp.token='' --NotebookApp.password=''
-      "
+      - .:/home/jovyan/work
+      - ./config/hadoop:/etc/hadoop/conf
+    environment:
+      - HADOOP_CONF_DIR=/etc/hadoop/conf
+      - YARN_CONF_DIR=/etc/hadoop/conf
+    depends_on:
+      - namenode
+      - spark-master
+      - kafka
+
+volumes:
+  hadoop_namenode:
+  hadoop_datanode:
+  hadoop_history:
