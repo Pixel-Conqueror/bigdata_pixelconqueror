@@ -1,9 +1,10 @@
+import { BarChart } from "@mantine/charts";
 import {
 	Badge,
-	Grid,
 	Group,
 	Rating,
 	RatingProps,
+	SimpleGrid,
 	Table,
 	TableData,
 	Text,
@@ -32,10 +33,15 @@ export const MovieDetails = () => {
 		caption: "Distribution des notes",
 		head: ["Note", "Nombre"],
 		body: Object.entries(movie.rating_distribution ?? {})
-			.sort((a, b) => Number(b[1]) - Number(a[1]))
+			.sort((a, b) => Number(b[0]) - Number(a[0]))
 			.map(([rating, count]) => [
 				<Rating value={Number(rating)} {...commonRatingProps} />,
-				count,
+				<Group gap={4}>
+					{count}{" "}
+					<Text c="dimmed">
+						({Math.round((Number(count) / movie.total_ratings) * 100)}%)
+					</Text>
+				</Group>,
 			]),
 		...getCommonTableProps(),
 	};
@@ -64,6 +70,17 @@ export const MovieDetails = () => {
 		...getCommonTableProps(),
 	};
 
+	const chartData = movie.rating_distribution
+		? Object.entries(movie.rating_distribution)
+				.map(([rating, count]) => ({
+					rating: Number(rating),
+					count,
+					percentage: Math.round((Number(count) / movie.total_ratings) * 100),
+					color: `blue.3`,
+				}))
+				.sort((a, b) => a.rating - b.rating)
+		: [];
+
 	return (
 		<>
 			<Title order={2} mb="md">
@@ -80,29 +97,46 @@ export const MovieDetails = () => {
 				Note moyenne: {movie.avg_rating} ({movie.total_ratings} votes)
 			</Text>
 
-			<Grid grow>
-				<Grid.Col span={1}>
-					{movie.rating_distribution ? (
-						<Table data={ratingData} />
-					) : (
-						<Text>Aucune distribution de notes disponible</Text>
-					)}
-				</Grid.Col>
-				<Grid.Col span={2}>
-					{movie.top_reviews.length > 0 ? (
-						<Table data={topReviewsData} />
-					) : (
-						<Text>Aucune note disponible</Text>
-					)}
-				</Grid.Col>
-				<Grid.Col span={2}>
-					{movie.worst_reviews.length > 0 ? (
-						<Table data={worstReviewsData} />
-					) : (
-						<Text>Aucune note disponible</Text>
-					)}
-				</Grid.Col>
-			</Grid>
+			<Title order={3} mb="md">
+				Distribution des notes
+			</Title>
+			<SimpleGrid cols={2}>
+				{movie.rating_distribution ? (
+					<Table data={ratingData} />
+				) : (
+					<Text>Aucune distribution de notes disponible</Text>
+				)}
+				{movie.rating_distribution && (
+					<BarChart
+						data={chartData}
+						dataKey="rating"
+						series={[
+							{ name: "count", label: "Nombre de votes", color: "blue.6" },
+						]}
+						tickLine="y"
+						gridAxis="xy"
+						valueFormatter={(value: number) => `${value}%`}
+						xAxisLabel="Note"
+						yAxisLabel="Nombre de votes"
+					/>
+				)}
+			</SimpleGrid>
+
+			<Title order={3} mt="md" mb="md">
+				Détails des notes
+			</Title>
+			<SimpleGrid cols={2}>
+				{movie.top_reviews.length > 0 ? (
+					<Table data={topReviewsData} />
+				) : (
+					<Text>Aucune note disponible</Text>
+				)}
+				{movie.worst_reviews.length > 0 ? (
+					<Table data={worstReviewsData} />
+				) : (
+					<Text>Aucune note disponible</Text>
+				)}
+			</SimpleGrid>
 		</>
 	);
 };
