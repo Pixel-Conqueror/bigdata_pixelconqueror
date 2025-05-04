@@ -1,0 +1,123 @@
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  padding: 2rem;
+  background-color: #121212;
+  color: #f1f1f1;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "Segoe UI", sans-serif;
+  font-size: 15px;
+  background-color: #1c1c1c;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
+}
+
+.table thead {
+  background-color: #e50914;
+  color: white;
+  text-align: left;
+}
+
+.table th {
+  padding: 14px 16px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #333;
+  color: #f1f1f1;
+}
+
+.table tr:hover {
+  background-color: #2a2a2a;
+  transition: background 0.2s ease-in-out;
+}
+
+.control-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.control-panel label {
+  font-weight: 500;
+  color: #f1f1f1;
+}
+
+.control-panel select {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  background-color: #2b2b2b;
+  color: #fff;
+  font-size: 14px;
+  box-shadow: 0 0 0 1px #444 inset;
+  transition: all 0.2s ease-in-out;
+}
+
+.control-panel select:hover,
+.control-panel select:focus {
+  outline: none;
+  background-color: #3a3a3a;
+  box-shadow: 0 0 0 2px #e50914 inset;
+}
+.genre-filter {
+  margin-bottom: 1rem;
+  color: #f1f1f1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.genre-filter label {
+  font-size: 14px;
+  cursor: pointer;
+}
+.genre-filter input {
+  margin-right: 0.4rem;
+}
+
+.control-panel input[type="number"] {
+  padding: 6px 10px;
+  width: 80px;
+  border: none;
+  border-radius: 4px;
+  background-color: #2b2b2b;
+  color: #fff;
+  box-shadow: 0 0 0 1px #444 inset;
+  transition: all 0.2s ease-in-out;
+}
+
+.control-panel input[type="number"]:hover,
+.control-panel input[type="number"]:focus {
+  outline: none;
+  background-color: #3a3a3a;
+  box-shadow: 0 0 0 2px #e50914 inset;
+}
+
+.control-panel input[type="text"] {
+  padding: 6px 10px;
+  width: 180px;
+  border: none;
+  border-radius: 4px;
+  background-color: #2b2b2b;
+  color: #fff;
+  box-shadow: 0 0 0 1px #444 inset;
+  transition: all 0.2s ease-in-out;
+}
+
+.control-panel input[type="text"]:hover,
+.control-panel input[type="text"]:focus {
+  outline: none;
+  background-color: #3a3a3a;
+  box-shadow: 0 0 0 2px #e50914 inset;
+}
