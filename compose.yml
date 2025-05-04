@@ -127,10 +127,16 @@ services:
       - ./config/hadoop:/etc/hadoop/conf
       - ./data:/data
       - ./scripts:/scripts
+      - ./requirements.txt:/tmp/requirements.txt
     depends_on:
       - namenode
+    command: >
+      /bin/bash -ec
+      "pip install --no-cache-dir -r /tmp/requirements.txt &&
+      /opt/bitnami/scripts/spark/entrypoint.sh /opt/bitnami/scripts/spark/run.sh"
     networks:
       - app-network
+    
 
   spark-worker:
     image: bitnami/spark:3.5.1
