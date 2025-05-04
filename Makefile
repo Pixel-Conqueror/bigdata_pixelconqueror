@@ -41,11 +41,11 @@ batch_etl_light:
 
 #5.1 ingestion des données dans mongodb
 load_to_mongo:
-	docker-compose exec backend \
-	  spark-submit \
-	    --master local[*] \
-	    --conf spark.mongodb.output.uri=$${MONGO_URI} \
-	    /scripts/ingest_to_mongo.py
+	docker exec -it spark-master spark-submit \
+	  --master local[*] \
+	  --driver-memory 4g \
+	  --conf spark.driver.maxResultSize=2g \
+	  /scripts/ingest_to_mongo.py
 
 
 
@@ -66,10 +66,10 @@ streaming:
 	  /scripts/streaming_recommendations.py
 
 # 8. Pipelines complètes
-pipeline: clean up init_hdfs batch_etl ingest_to_mongo train_als streaming
+pipeline: clean up init_hdfs batch_etl load_to_mongo train_als streaming
 	@echo "✅ Pipeline complète terminée !"
 
-pipeline_light: clean up init_hdfs batch_etl_light ingest_to_mongo train_als streaming
+pipeline_light: clean up init_hdfs batch_etl_light load_to_mongo train_als streaming
 	@echo "✅ Pipeline light complète terminée !"
 
 # Backend commands

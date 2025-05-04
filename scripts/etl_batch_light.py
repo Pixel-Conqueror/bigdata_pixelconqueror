@@ -2,7 +2,8 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, year, month, dayofmonth,
-    avg, stddev, rand
+    avg, stddev, rand,
+    when
 )
 
 def main():
@@ -27,7 +28,7 @@ def main():
     "genres",
     when(col("genres") == "(no genres listed)", "unknown")
     .otherwise(col("genres"))
-)
+    )
 
     # Échantillonnage : garder au plus 1 million de lignes
     total_count = ratings_raw_all.count()

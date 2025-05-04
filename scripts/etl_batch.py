@@ -2,7 +2,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, year, month, dayofmonth,
-    avg, stddev
+    avg, stddev, when
 )
 
 def main():
@@ -22,6 +22,11 @@ def main():
     ratings_raw = spark.read.csv(
         "hdfs://namenode:9000/movielens/raw/ratings/ratings.csv",
         header=True, inferSchema=True
+    )
+    movies_clean = movies_raw.withColumn(
+    "genres",
+    when(col("genres") == "(no genres listed)", "unknown")
+    .otherwise(col("genres"))
     )
 
     # Stats globales
@@ -61,7 +66,7 @@ def main():
         .withColumn("day",   dayofmonth(col("timestamp")))
 
     # Écriture CSV batch
-    movies_raw.repartition(1) \
+    movies_clean.repartition(1) \
         .write.option("header", True) \
         .mode("overwrite") \
         .csv("hdfs://namenode:9000/movielens/processed/batch/movies_csv")
