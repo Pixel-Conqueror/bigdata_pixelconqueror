@@ -8,10 +8,10 @@ up:
 down:
 	docker compose down
 
-	
-clean:
-	docker compose down --rmi all --volumes --remove-orphans
-	docker system prune -af
+
+# clean:
+# 	docker compose down --rmi all --volumes --remove-orphans
+# 	docker system prune -af
 
 # 3. Voir les logs
 logs:
@@ -68,7 +68,7 @@ streaming:
 
 
 # 8. Pipelines complètes
-pipeline: clean up init_hdfs batch_etl load_to_mongo train_al generate_recs streaming
+pipeline: clean up init_hdfs batch_etl load_to_mongo train_als generate_recs streaming
 	@echo "✅ Pipeline complète terminée !"
 
 pipeline_light: clean up init_hdfs batch_etl_light load_to_mongo train_als generate_recs streaming
