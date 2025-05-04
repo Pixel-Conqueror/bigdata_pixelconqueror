@@ -1,4 +1,9 @@
-import { HealthStatus, MoviesResponse, ShapesData } from "../types/index";
+import {
+	HealthStatus,
+	Movie,
+	MoviesResponse,
+	ShapesData,
+} from "../types/index";
 
 const API_URL = "http://localhost:5001";
 const LIMIT = 50;
@@ -18,6 +23,7 @@ export const querykeys = {
 		searchQuery?: string,
 		selectedGender?: string | null
 	) => ["movies", page, limit, searchQuery, selectedGender],
+	movieDetails: (movieId: number) => ["movie", movieId],
 };
 
 export const apiService = {
@@ -42,6 +48,11 @@ export const apiService = {
 			genre,
 		});
 		const response = await fetch(url);
+		return response.json();
+	},
+
+	async getMovieDetails(movieId: number): Promise<Movie> {
+		const response = await fetch(`${API_URL}/api/movies/${movieId}`);
 		return response.json();
 	},
 
