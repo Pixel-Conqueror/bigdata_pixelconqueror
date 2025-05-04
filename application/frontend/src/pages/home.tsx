@@ -10,6 +10,7 @@ import {
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { GenderFilter } from "../components/gender_filter";
+import { InternalLink } from "../components/generics/internal_link";
 import { StatsGroup } from "../components/generics/stats/stats";
 import { SearchBar } from "../components/search_bar";
 import { useDebounceState } from "../hooks/use_debounce_state";
@@ -112,7 +113,14 @@ export const Home = () => {
 					<tbody>
 						{moviesData?.movies.map((movie) => (
 							<tr key={movie.movieId}>
-								<td>{movie.title}</td>
+								<td>
+									<InternalLink
+										to={`/movies/${movie.movieId}`}
+										style={{ textDecoration: "none" }}
+									>
+										{movie.title}
+									</InternalLink>
+								</td>
 								<td>{movie.genres.join(", ")}</td>
 							</tr>
 						))}

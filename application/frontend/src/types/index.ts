@@ -19,12 +19,14 @@ export type Review = {
 };
 
 export type Movie = {
-	avg_rating: number;
-	genres: string[];
 	movieId: number;
-	rating_distribution: Record<string, number>;
 	title: string;
+	genres: string[];
+	avg_rating: number | null;
+	total_ratings: number;
+	rating_distribution: Record<string, number> | null;
 	top_reviews: Review[];
+	worst_reviews: Review[];
 };
 
 export type MovieLight = {
