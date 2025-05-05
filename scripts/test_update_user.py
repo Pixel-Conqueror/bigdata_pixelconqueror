@@ -6,7 +6,7 @@ import json
 from pymongo import MongoClient
 
 # === CONFIGURATION ===
-USER_ID = 118205  
+USER_ID = 118205
 NUM_RATINGS = 10
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongo:27017/movies")
 TOPIC = "movielens_ratings"
@@ -18,7 +18,7 @@ def get_movie_ids():
     ids = [doc["movieId"] for doc in db.movies.find({}, {"movieId": 1})]
     client.close()
     return ids
-    
+
 
 def produce_to_kafka(message: dict):
     # Envoie un seul message JSON au topic via kafka-console-producer
