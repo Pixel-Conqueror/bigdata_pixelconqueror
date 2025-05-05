@@ -10,6 +10,20 @@ Ce projet implémente un système de recommandation de films utilisant une archi
 - **MongoDB** pour le stockage des données nettoyées
 - **ALS (Alternating Least Squares)** pour l'algorithme de recommandation
 
+## 🏗️ Architecture
+
+![Architecture du système](docs/full%20archi.svg)
+
+Le système est composé de plusieurs composants :
+
+- **Frontend** (React) : Interface utilisateur pour visualiser les recommandations
+- **Backend** (Python) : API REST pour gérer les requêtes
+- **MongoDB** : Base de données pour stocker les données nettoyées
+- **Hadoop HDFS** : Stockage distribué des données brutes
+- **Spark** : Traitement des données et entraînement du modèle
+- **Kafka** : Gestion des flux de données en temps réel
+- **Jupyter Notebook** : Environnement de développement et d'expérimentation
+
 ## 🚀 Démarrage rapide
 
 ### Prérequis
