@@ -1,5 +1,5 @@
+from datetime import datetime
 from flask import Blueprint, jsonify, request  # type: ignore
-from app.services.data_loader import insert_data
 from app.enums.genres import GENRES
 from pymongo import MongoClient  # type: ignore
 import os
@@ -11,12 +11,6 @@ def get_db():
     mongo_uri = os.getenv("MONGO_URI", "mongodb://mongo:27017/movies")
     client = MongoClient(mongo_uri)
     return client.get_database()
-
-
-@bp.route('/api/insert', methods=['GET'])
-def insert_route():
-    result = insert_data()
-    return jsonify(result)
 
 
 @bp.route('/api/health', methods=['GET'])
@@ -187,7 +181,6 @@ def get_movie_details(movie_id):
         "rating_distribution": rating_distribution
     })
 
-from datetime import datetime
 
 @bp.route('/api/users/<int:user_id>', methods=['GET'])
 def get_user_profile(user_id):
@@ -203,7 +196,8 @@ def get_user_profile(user_id):
     page_size = 50
     skip_count = (page - 1) * page_size
 
-    user = db.users.find_one({"userId": user_id}, {"_id": 0, "userId": 1, "username": 1})
+    user = db.users.find_one({"userId": user_id}, {
+                             "_id": 0, "userId": 1, "username": 1})
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -236,7 +230,8 @@ def get_user_profile(user_id):
                 "timestamp": r["timestamp"].isoformat() if isinstance(r["timestamp"], datetime) else str(r["timestamp"])
             })
 
-    reco_doc = db.recommendations.find_one({"userId": user_id}, {"_id": 0, "recommendations": 1})
+    reco_doc = db.recommendations.find_one(
+        {"userId": user_id}, {"_id": 0, "recommendations": 1})
     recommended_movie_ids = reco_doc["recommendations"] if reco_doc else []
 
     recommended_movies_cursor = db.movies.find(
@@ -256,4 +251,3 @@ def get_user_profile(user_id):
         "ratings": enriched_ratings,
         "recommendations": recommended_movies
     })
-
