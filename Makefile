@@ -8,10 +8,16 @@ up:
 down:
 	docker compose down
 
+# 2.1 Création de l'environnement virtuel
+venv:
+	python3 -m venv venv
+	chmod +x venv/bin/activate
+	chmod 755 venv/bin/activate
+	. venv/bin/activate && pip install -r requirements.txt
 
-clean:
-	docker compose down --rmi all --volumes --remove-orphans
-	docker system prune -af
+# clean:
+# 	docker compose down --rmi all --volumes --remove-orphans
+# 	docker system prune -af
 
 # 3. Voir les logs
 logs:
@@ -91,7 +97,7 @@ backend-logs:
 	docker logs -f api
 
 mongo-shell:
-	docker exec -it mongo-db mongosh
+	docker exec -it mongo-db mongosh movies
 
 # Kafka commands
 kafka-topics:
