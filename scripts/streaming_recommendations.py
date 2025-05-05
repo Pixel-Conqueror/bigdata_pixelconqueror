@@ -1,88 +1,68 @@
-#!/usr/bin/env python3
-# scripts/streaming_recommendations.py
-
 import os
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, from_json, expr
-from pyspark.sql.types import StructType, StructField, IntegerType, DoubleType, LongType
-from pyspark.ml.recommendation import ALSModel
+import time
+import random
+import json
 from pymongo import MongoClient
+from kafka import KafkaProducer
 
-def get_db():
-    """
-    Récupère l'URI Mongo depuis MONGO_URI (ex: mongodb://mongo:27017/movies)
-    et renvoie la database par défaut.
-    """
-    mongo_uri = os.getenv("MONGO_URI", "mongodb://mongo:27017/movies")
-    client = MongoClient(mongo_uri)
-    return client.get_default_database()
+# === CONFIGURATION ===
+USER_ID = 118205 # ID de l'utilisateur pour lequel on va envoyer des notes
+NUM_RATINGS = 10
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongo:27017/movies")
+KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "kafka:9092")
+TOPIC = "movielens_ratings"
 
-def write_to_mongo(batch_df, batch_id):
-    """
-    Pour chaque micro-batch, convertit les recommendations en dict
-    puis upsert dans la collection `recommendations`.
-    """
-    db = get_db()
-    coll = db.recommendations
+# === INITIALISATION DU PRODUCTEUR KAFKA ===
+producer = KafkaProducer(
+    bootstrap_servers=KAFKA_BOOTSTRAP,
+    value_serializer=lambda v: json.dumps(v).encode("utf-8")
+)
 
-    records = batch_df.select("userId", "recommendations") \
-                      .rdd.map(lambda r: {
-                          "userId": int(r.userId),
-                          "recommendations": [int(x) for x in r.recommendations]
-                      }).collect()
-    if not records:
-        return
+def get_movie_ids():
+    """Récupère tous les movieId présent dans la collection movies."""
+    client = MongoClient(MONGO_URI)
+    db = client.get_default_database()
+    ids = [doc["movieId"] for doc in db.movies.find({}, {"movieId": 1})]
+    client.close()
+    return ids
 
-    for rec in records:
-        coll.replace_one({"userId": rec["userId"]}, rec, upsert=True)
+def produce_to_kafka(message: dict):
+    """Envoie un message JSON au topic Kafka."""
+    producer.send(TOPIC, message)
+    producer.flush()
 
 def main():
-    spark = SparkSession.builder \
-        .appName("StreamingRecs") \
-        .master("local[*]") \
-        .config("spark.driver.memory", "2g") \
-        .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:9000") \
-        .getOrCreate()
+    # 1) Récupération des films
+    movies = get_movie_ids()
+    print(f"Nombre total de films : {len(movies)}")
+    print(f"Nombre de notes à envoyer : {NUM_RATINGS}")
 
-    # 1. Charger le modèle ALS entraîné
-    model = ALSModel.load("hdfs://namenode:9000/movielens/models/als_best")
+    # 2) Tirage aléatoire
+    sample = random.sample(movies, min(NUM_RATINGS, len(movies)))
+    print(f"Envoi de {len(sample)} notes pour l'utilisateur {USER_ID}…")
 
-    # 2. Schéma du JSON entrant de Kafka
-    schema = StructType([
-        StructField("userId",   IntegerType()),
-        StructField("movieId",  IntegerType()),
-        StructField("rating",   DoubleType()),
-        StructField("timestamp",LongType())
-    ])
+    # 3) Publication sur Kafka
+    for mid in sample:
+        msg = {
+            "userId": USER_ID,
+            "movieId": mid,
+            "rating": round(random.uniform(1.0, 5.0), 1),
+            "timestamp": int(time.time())
+        }
+        produce_to_kafka(msg)
+        print("→ envoyé :", msg)
+        time.sleep(0.1)
 
-    # 3. Lecture du topic Kafka
-    raw = spark.readStream \
-        .format("kafka") \
-        .option("kafka.bootstrap.servers", "kafka:9092") \
-        .option("subscribe", "movielens_ratings") \
-        .load() \
-        .selectExpr("CAST(value AS STRING) AS json")
+    # 4) Attente pour que le streaming traite les nouvelles notes
+    print("⏳ Attente de la mise à jour des recommandations…")
+    time.sleep(5)
 
-    # 4. Parsing JSON
-    parsed = raw.select(from_json(col("json"), schema).alias("data")) \
-                .select("data.*")
-
-    # 5. Pour chaque micro-batch, on génère les recommandations
-    def foreach_batch(batch_df, batch_id):
-        users = batch_df.select("userId").distinct()
-        recs = model.recommendForUserSubset(users, 5) \
-                    .selectExpr(
-                        "userId",
-                        "transform(recommendations, x -> x.movieId) AS recommendations"
-                    )
-        write_to_mongo(recs, batch_id)
-
-    query = parsed.writeStream \
-        .foreachBatch(foreach_batch) \
-        .outputMode("append") \
-        .start()
-
-    query.awaitTermination()
+    # 5) Lecture des recommandations mises à jour dans MongoDB
+    client = MongoClient(MONGO_URI)
+    db = client.get_default_database()
+    rec = db.recommendations.find_one({"userId": USER_ID})
+    print("✅ Recommandations mises à jour :", rec)
+    client.close()
 
 if __name__ == "__main__":
     main()

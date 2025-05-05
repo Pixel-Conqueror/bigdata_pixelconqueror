@@ -9,9 +9,9 @@ down:
 	docker compose down
 
 
-# clean:
-# 	docker compose down --rmi all --volumes --remove-orphans
-# 	docker system prune -af
+clean:
+	docker compose down --rmi all --volumes --remove-orphans
+	docker system prune -af
 
 # 3. Voir les logs
 logs:
