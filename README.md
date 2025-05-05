@@ -1,23 +1,138 @@
-# Big Data Pseudo-distributed Environment with Hadoop, Spark, Kafka, Python, and Jupyter
+# 🎬 Système de Recommandation de Films
 
-## 🌍 Project Overview
+## 🌍 Vue d'ensemble
 
-This project provides a ready-to-use Dockerized environment to work with:
+Ce projet implémente un système de recommandation de films utilisant une architecture Big Data avec :
 
-- **Hadoop 3.3.6** (pseudo-distributed)
-- **Spark 3.5.1** (standalone mode)
-- **Kafka 4.0.0** (with Zookeeper)
-- **Python 3** + **PySpark**
-- **Jupyter Notebook**
+- **Hadoop HDFS** pour le stockage distribué
+- **Spark** pour le traitement des données
+- **Kafka** pour le streaming en temps réel
+- **MongoDB** pour le stockage des données nettoyées
+- **ALS (Alternating Least Squares)** pour l'algorithme de recommandation
+
+## 🚀 Démarrage rapide
+
+### Prérequis
+
+- Docker et Docker Compose
+- Python 3.x
+
+### Installation
+
+Vous avez le choix entre deux approches :
+
+#### 1. Approche automatisée (recommandée)
+
+```bash
+# Pipeline complète
+make pipeline
+
+# ou version allégée
+make pipeline_light
+```
+
+#### 2. Approche manuelle (étape par étape)
+
+1. **Lancer l'environnement Docker**
+
+```bash
+make up
+```
+
+2. **Initialiser HDFS et ingérer les données**
+
+```bash
+make init_hdfs
+```
+
+3. **Nettoyer et enrichir les données (ETL)**
+
+```bash
+make batch_etl
+# ou version allégée
+make batch_etl_light
+```
+
+4. **Charger les données dans MongoDB**
+
+```bash
+make load_to_mongo
+```
+
+5. **Entraîner le modèle ALS**
+
+```bash
+make train_als
+```
+
+6. **Générer les recommandations**
+
+```bash
+make generate_recs
+```
+
+7. **Lancer le streaming**
+
+```bash
+make streaming
+```
+
+````
+
+## 🛠️ Commandes utiles
+
+### Gestion de l'environnement
+
+```bash
+# Arrêter l'environnement
+make down
+
+# Voir les logs
+make logs
+````
+
+### Backend
+
+```bash
+# Accéder au shell du backend
+make backend-shell
+
+# Voir les logs du backend
+make backend-logs
+```
+
+### MongoDB
+
+```bash
+# Accéder au shell MongoDB
+make mongo-shell
+```
+
+### Kafka
+
+```bash
+# Lister les topics Kafka
+make kafka-topics
+```
+
+### Jupyter
+
+```bash
+# Obtenir le token Jupyter
+make jupyter-token
+```
 
 ## 📊 Architecture
 
-- Hadoop HDFS for distributed file storage (single-node setup)
-- Spark for batch and streaming data processing
-- Kafka for streaming ingestion
-- Python environment with Jupyter for development and experimentation
+- **Frontend** : http://localhost:3000
+- **Backend API** : http://localhost:5001
+- **MongoDB** : localhost:27017
+- **Hadoop HDFS Namenode UI** : http://localhost:9870
+- **Spark Master UI** : http://localhost:8080
+- **Kafka** : localhost:9092
+- **Jupyter Notebook** : http://localhost:8888
 
-## 🔧 Project Structure
+## 📁 Structure du projet
 
 ```
 /
@@ -27,83 +142,23 @@ This project provides a ready-to-use Dockerized environment to work with:
 |-- requirements.txt
 |-- config/
 |   |-- hadoop/
-|       |-- core-site.xml
-|       |-- hdfs-site.xml
-|       |-- mapred-site.xml
-|       |-- yarn-site.xml
-|-- notebooks/
-|   |-- spark_kafka_demo.ipynb
 |-- scripts/
-    |-- spark_batch_csv_count.py
+    |-- etl_batch.py
+    |-- etl_batch_light.py
+    |-- generate_all_recommendations.py
+    |-- ingest_to_mongo.py
+    |-- init_hdfs.sh
+    |-- streaming_recommendations.py
+    |-- test_update_user.py
+    |-- train_als.py
 ```
 
-## 🔄 Quick Start
+## 🔔 Notes importantes
 
-### 1. Build the Docker Image
-
-```bash
-make build
-```
-
-### 2. Launch the Environment
-
-```bash
-make up
-```
-
-### 3. Access the Container
-
-```bash
-make shell
-```
-
-### 4. Shut Down
-
-```bash
-make down
-```
-
-### 5. Clean Everything (containers, images, volumes)
-
-```bash
-make clean
-```
-
-## 🌐 Services & Ports
-
-### Frontend & Backend
-
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:5001
-- **MongoDB**: localhost:27017
-
-### Big Data Services
-
-- **Hadoop HDFS Namenode UI**: http://localhost:9870
-- **Hadoop HDFS RPC**: localhost:9000
-- **Spark Master UI**: http://localhost:8080
-- **Spark Worker UI**: http://localhost:8081
-- **Kafka**: localhost:9092
-- **Zookeeper**: localhost:2181
-- **Jupyter Notebook**: http://localhost:8888
-
-## 📄 Notebooks & Scripts
-
-- **spark_kafka_demo.ipynb** : Connects Spark Structured Streaming to a Kafka topic and displays the streamed data.
-- **spark_batch_csv_count.py** : A simple Spark batch job reading a CSV file from HDFS and counting rows.
-
-## 🔔 Notes
-
-- Ensure you manually create Kafka topics using:
-  ```bash
-  kafka-topics.sh --create --topic test-topic --bootstrap-server localhost:9092
-  ```
-- Upload datasets to HDFS:
-  ```bash
-  hdfs dfs -mkdir -p /datasets
-  hdfs dfs -put your_file.csv /datasets/
-  ```
+- Assurez-vous d'avoir suffisamment de mémoire disponible pour Spark (4GB minimum)
+- Les données doivent être correctement formatées avant l'ingestion
+- Le modèle ALS nécessite des données nettoyées pour un bon entraînement
 
 ---
 
-Made with ❤️ by Marie
+Made with ❤️ by Robin, Thomas et Sonny
