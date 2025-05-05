@@ -1,68 +1,85 @@
 import os
-import time
-import random
 import json
 from pymongo import MongoClient
-from kafka import KafkaProducer
+from kafka import KafkaConsumer
+from pyspark.sql import SparkSession
+from pyspark.ml.recommendation import ALSModel
 
 # === CONFIGURATION ===
-USER_ID = 118205 # ID de l'utilisateur pour lequel on va envoyer des notes
-NUM_RATINGS = 10
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongo:27017/movies")
+MONGO_URI       = os.getenv("MONGO_URI", "mongodb://mongo:27017/movies")
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "kafka:9092")
-TOPIC = "movielens_ratings"
+TOPIC           = "movielens_ratings"
+MODEL_PATH      = os.getenv("ALS_MODEL_PATH", "hdfs://namenode:9000/models/als")  
+# Chemin HDFS (ou local) vers votre modèle ALS déjà entraîné
 
-# === INITIALISATION DU PRODUCTEUR KAFKA ===
-producer = KafkaProducer(
-    bootstrap_servers=KAFKA_BOOTSTRAP,
-    value_serializer=lambda v: json.dumps(v).encode("utf-8")
-)
-
-def get_movie_ids():
-    """Récupère tous les movieId présent dans la collection movies."""
+def save_rating_to_mongo(rating: dict):
     client = MongoClient(MONGO_URI)
     db = client.get_default_database()
-    ids = [doc["movieId"] for doc in db.movies.find({}, {"movieId": 1})]
+    db.ratings.insert_one(rating)
     client.close()
-    return ids
 
-def produce_to_kafka(message: dict):
-    """Envoie un message JSON au topic Kafka."""
-    producer.send(TOPIC, message)
-    producer.flush()
+def recompute_recommendations(user_id: int):
+    # 1) On (re)charge Spark et le modèle ALS
+    spark = SparkSession.builder \
+        .appName("StreamingRecs") \
+        .getOrCreate()
+
+    # Charge toutes les notes (historiques + nouvelles) depuis MongoDB via Spark
+    ratings_df = spark.read \
+        .format("mongo") \
+        .option("uri", MONGO_URI) \
+        .option("collection", "ratings") \
+        .load()
+    
+    # Charge le modèle ALS pré-entraîné
+    model = ALSModel.load(MODEL_PATH)
+    
+    # Génère les Top-N recommandations pour TOUS les utilisateurs
+    user_recs = model.recommendForAllUsers(10)
+    
+    # Filtre celles de notre utilisateur
+    subset = user_recs.filter(f"userId = {user_id}") \
+                      .select("recommendations") \
+                      .collect()
+    
+    # Extrait la liste [(movieId, rating), …]
+    recs = []
+    if subset:
+        recs = [(r.movieId, float(r.rating)) for r in subset[0].recommendations]
+    
+    spark.stop()
+    
+    # 2) On push en base les nouvelles recommandations
+    client = MongoClient(MONGO_URI)
+    db = client.get_default_database()
+    db.recommendations.update_one(
+        {"userId": user_id},
+        {"$set": {"userId": user_id, "topN": recs}},
+        upsert=True
+    )
+    client.close()
+    print(f"✅ Recos mises à jour pour userId={user_id} : {recs}")
 
 def main():
-    # 1) Récupération des films
-    movies = get_movie_ids()
-    print(f"Nombre total de films : {len(movies)}")
-    print(f"Nombre de notes à envoyer : {NUM_RATINGS}")
-
-    # 2) Tirage aléatoire
-    sample = random.sample(movies, min(NUM_RATINGS, len(movies)))
-    print(f"Envoi de {len(sample)} notes pour l'utilisateur {USER_ID}…")
-
-    # 3) Publication sur Kafka
-    for mid in sample:
-        msg = {
-            "userId": USER_ID,
-            "movieId": mid,
-            "rating": round(random.uniform(1.0, 5.0), 1),
-            "timestamp": int(time.time())
-        }
-        produce_to_kafka(msg)
-        print("→ envoyé :", msg)
-        time.sleep(0.1)
-
-    # 4) Attente pour que le streaming traite les nouvelles notes
-    print("⏳ Attente de la mise à jour des recommandations…")
-    time.sleep(5)
-
-    # 5) Lecture des recommandations mises à jour dans MongoDB
-    client = MongoClient(MONGO_URI)
-    db = client.get_default_database()
-    rec = db.recommendations.find_one({"userId": USER_ID})
-    print("✅ Recommandations mises à jour :", rec)
-    client.close()
+    consumer = KafkaConsumer(
+        TOPIC,
+        bootstrap_servers=[KAFKA_BOOTSTRAP],
+        value_deserializer=lambda m: json.loads(m.decode("utf-8")),
+        auto_offset_reset="earliest",
+        enable_auto_commit=True,
+        group_id="recs-streaming-group"
+    )
+    print("▶️ En attente de messages sur le topic", TOPIC)
+    
+    for msg in consumer:
+        rating = msg.value
+        print("← Reçu :", rating)
+        
+        # 1) Sauvegarde la note brute
+        save_rating_to_mongo(rating)
+        
+        # 2) Relance le calcul des recommandations pour cet user
+        recompute_recommendations(rating["userId"])
 
 if __name__ == "__main__":
     main()
