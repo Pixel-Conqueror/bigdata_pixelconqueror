@@ -77,8 +77,6 @@ make generate_recs
 make streaming
 ```
 
-````
-
 ## 🛠️ Commandes utiles
 
 ### Gestion de l'environnement
@@ -89,7 +87,7 @@ make down
 
 # Voir les logs
 make logs
-````
+```
 
 ### Backend
 
@@ -152,6 +150,17 @@ make jupyter-token
     |-- test_update_user.py
     |-- train_als.py
 ```
+
+## 📄 Scripts et leurs fonctionnalités
+
+- **etl_batch.py** : Script de nettoyage des données en mode batch
+- **etl_batch_light.py** : Version allégée du nettoyage des données
+- **generate_all_recommendations.py** : Génération des recommandations pour tous les utilisateurs avec leurs notes de base
+- **ingest_to_mongo.py** : Insertion des données nettoyées en base MongoDB
+- **init_hdfs.sh** : Initialisation d'Hadoop et dépot des fichiers dans HDFS
+- **streaming_recommendations.py** : Consumer Kafka qui attend des JSON pour mettre à jour les recommandations
+- **test_update_user.py** : Producer qui génère des notes pour un utilisateur donné
+- **train_als.py** : Entraînement du modèle de recommandation ALS
 
 ## 🔔 Notes importantes
 
